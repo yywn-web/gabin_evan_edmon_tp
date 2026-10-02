@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# BONUS - CI de validation de l'IaC, declenchee sur chaque Pull Request vers main.
+# Donne aux relecteurs un signal technique AVANT la revue humaine.
+# Elle n'execute JAMAIS terraform apply : le deploiement reste manuel.
+# ---------------------------------------------------------------------------
+name: CI IaC
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [staging, prod]
+    env:
+      # Le plan n'est execute que si des identifiants AWS Academy (valables ~4 h)
+      # ont ete deposes dans les secrets du depot pour la seance en cours.
+      HAS_AWS: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+      ENV_DIR: terraform/environments/${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Formatage (terraform fmt -check)
+        run: terraform fmt -check -recursive terraform
+
+      - name: Initialisation (providers et modules)
+        run: terraform -chdir="$ENV_DIR" init -input=false
+
+      - name: Validation (terraform validate)
+        run: terraform -chdir="$ENV_DIR" validate
+
+      # Valeurs factices : le plan ne cree rien, il verifie la configuration
+      # contre l'API AWS. La cle SSH est generee a la volee pour file().
+      - name: Plan (sans apply)
+        if: env.HAS_AWS == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_DEFAULT_REGION: us-east-1
+          TF_VAR_admin_cidr: 203.0.113.10/32
+          TF_VAR_db_password: CiPlaceholderOnly123
+          TF_VAR_public_key_path: /tmp/ci_key.pub
+        run: |
+          ssh-keygen -t ed25519 -N "" -f /tmp/ci_key -q
+          terraform -chdir="$ENV_DIR" plan -input=false -lock=false -no-color \
+            -var-file="${{ matrix.env }}.tfvars"
+
+      - name: Plan ignore (pas d'identifiants AWS pour cette seance)
+        if: env.HAS_AWS != 'true'
+        run: echo "::notice::Plan saute - deposer AWS_ACCESS_KEY_ID / SECRET / SESSION_TOKEN dans les secrets du depot."
+
+  ansible-lint:
+    name: ansible-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Installer ansible-lint et les collections
+        run: |
+          pip install ansible-core ansible-lint boto3 botocore
+          ansible-galaxy collection install amazon.aws community.general
+      # Mot de passe de coffre factice : le vrai n'est jamais dans le depot.
+      - name: Lint des roles et du playbook
+        working-directory: ansible
+        run: |
+          echo "ci-dummy" > .vault_pass
+          ansible-lint site.yml roles/
