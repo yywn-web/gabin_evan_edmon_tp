@@ -1,0 +1,24 @@
+# --- Etat Terraform (contient des valeurs sensibles) : propre a chaque poste ---
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+.terraform.tfstate.lock.info
+# --- Secrets Terraform : seuls les modeles .example sont versionnes ---
+# Les fichiers <env>.tfvars (dimensionnement, sans secret) SONT versionnes.
+secrets.auto.tfvars
+*.secret.tfvars
+# --- Ansible : mot de passe du coffre et fichiers generes ---
+ansible/.vault_pass
+ansible/generated/
+*.retry
+*.log
+# --- Cles et identifiants ---
+*.pem
+*.key
+id_rsa
+id_ed25519
+credentials
+.env
+terraform/modules/**/.terraform.lock.hcl
