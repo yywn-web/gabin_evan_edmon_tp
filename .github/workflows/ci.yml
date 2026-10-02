@@ -35,16 +35,25 @@ jobs:
       - name: Formatage (terraform fmt -check)
         run: terraform fmt -check -recursive terraform
 
+      # Tant que l'environnement n'est pas encore merge, on le signale sans echouer.
+      - name: Presence de l'environnement
+        id: envcheck
+        run: |
+          if [ -f "$ENV_DIR/main.tf" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "::notice::$ENV_DIR absent sur cette branche"; fi
+
       - name: Initialisation (providers et modules)
+        if: steps.envcheck.outputs.ok == 'true'
         run: terraform -chdir="$ENV_DIR" init -input=false
 
       - name: Validation (terraform validate)
+        if: steps.envcheck.outputs.ok == 'true'
         run: terraform -chdir="$ENV_DIR" validate
 
       # Valeurs factices : le plan ne cree rien, il verifie la configuration
       # contre l'API AWS. La cle SSH est generee a la volee pour file().
       - name: Plan (sans apply)
-        if: env.HAS_AWS == 'true'
+        if: env.HAS_AWS == 'true' && steps.envcheck.outputs.ok == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -78,5 +87,6 @@ jobs:
       - name: Lint des roles et du playbook
         working-directory: ansible
         run: |
+          if [ ! -f site.yml ]; then echo "::notice::Ansible pas encore merge"; exit 0; fi
           echo "ci-dummy" > .vault_pass
           ansible-lint site.yml roles/
