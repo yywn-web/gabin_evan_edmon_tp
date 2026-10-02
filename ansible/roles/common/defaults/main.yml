@@ -1,0 +1,9 @@
+---
+# Socle commun : valeurs surchargeables depuis group_vars si besoin.
+common_timezone: Europe/Paris
+common_packages:
+  - curl
+  - ca-certificates
+  - htop
+  - unzip
+  - jq

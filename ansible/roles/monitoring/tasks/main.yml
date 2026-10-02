@@ -1,0 +1,74 @@
+---
+# Role monitoring : agent node_exporter et sonde de disponibilite applicative.
+
+- name: Installer node_exporter depuis les depots Ubuntu
+  ansible.builtin.apt:
+    name: "{{ monitoring_package }}"
+    state: present
+
+# Options de l'agent (port, collecteurs) : differenciees par environnement.
+- name: Configurer les options de node_exporter
+  ansible.builtin.template:
+    src: node_exporter.default.j2
+    dest: /etc/default/prometheus-node-exporter
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Redemarrer node_exporter
+
+- name: Creer le dossier du collecteur textfile
+  ansible.builtin.file:
+    path: "{{ monitoring_textfile_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Sonde : publie trackfleet_http_up (0/1) et le temps de reponse de /health.
+- name: Deployer la sonde HTTP
+  ansible.builtin.template:
+    src: trackfleet_probe.sh.j2
+    dest: /usr/local/bin/trackfleet_probe.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Planifier la sonde HTTP
+  ansible.builtin.cron:
+    name: trackfleet_probe
+    minute: "{{ monitoring_probe_cron_minute }}"
+    job: /usr/local/bin/trackfleet_probe.sh
+    user: root
+
+# Premiere mesure immediate ; creates rend la tache idempotente.
+- name: Executer une premiere fois la sonde
+  ansible.builtin.command: /usr/local/bin/trackfleet_probe.sh
+  args:
+    creates: "{{ monitoring_textfile_dir }}/trackfleet.prom"
+  when: not ansible_check_mode
+
+- name: Demarrer node_exporter et l'activer au boot
+  ansible.builtin.service:
+    name: "{{ monitoring_service }}"
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Appliquer immediatement les redemarrages en attente
+  ansible.builtin.meta: flush_handlers
+
+# Verification : l'agent repond et expose la metrique de la sonde.
+- name: Interroger les metriques en local
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ monitoring_listen_port }}/metrics"
+    return_content: true
+  register: monitoring_metrics
+  when: not ansible_check_mode
+
+- name: Verifier les metriques systeme et applicatives
+  ansible.builtin.assert:
+    that:
+      - "'node_cpu_seconds_total' in monitoring_metrics.content"
+      - ('trackfleet_http_up{env="' ~ app_env ~ '"} 1') in monitoring_metrics.content
+    success_msg: "node_exporter OK, sonde applicative a 1"
+  when: not ansible_check_mode

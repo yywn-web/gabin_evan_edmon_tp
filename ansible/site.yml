@@ -1,0 +1,20 @@
+---
+# Playbook principal, commun aux deux environnements. L'environnement est
+# choisi au lancement (./run_playbook.sh staging|prod -> --limit <env>) ; ses
+# differences viennent uniquement de group_vars/<env>.yml.
+- name: Configurer les instances applicatives TrackFleet
+  hosts: role_app
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    # Secret RDS de l'environnement, chiffre par Ansible Vault.
+    - name: Charger le secret de l'environnement depuis le coffre
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/vault/{{ app_env }}.yml"
+      no_log: true
+
+  roles:
+    - role: common       # socle systeme et durcissement SSH
+    - role: webserver    # Nginx + PHP + page de test connectee a RDS
+    - role: monitoring   # node_exporter + sonde HTTP

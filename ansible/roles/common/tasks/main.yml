@@ -1,0 +1,34 @@
+---
+# Socle applique a toute instance avant l'application.
+
+# cache_valid_time : le cache n'est rafraichi que s'il a plus d'une heure
+# (idempotence). check_mode: false : rafraichi reellement meme en --check,
+# sinon le dry-run echoue sur une instance au cache trop ancien.
+- name: Mettre a jour le cache APT si necessaire
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  check_mode: false
+
+- name: Installer les outils de base d'administration
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+# Horodatage coherent des journaux entre instances (analyse d'incident).
+- name: Regler le fuseau horaire
+  community.general.timezone:
+    name: "{{ common_timezone }}"
+
+# Durcissement SSH dans un fichier dedie de sshd_config.d (lu avant le fichier
+# cloud-init 60-*, la premiere valeur l'emporte). validate : sshd teste la
+# syntaxe AVANT remplacement, une erreur ne peut donc pas couper l'acces SSH.
+- name: Appliquer le durcissement SSH
+  ansible.builtin.template:
+    src: sshd_hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Recharger sshd

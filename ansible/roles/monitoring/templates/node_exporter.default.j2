@@ -1,0 +1,3 @@
+# {{ ansible_managed }}
+# Options de node_exporter pour l'environnement {{ app_env }}.
+ARGS="--web.listen-address=:{{ monitoring_listen_port }} --collector.textfile.directory={{ monitoring_textfile_dir }}{% for c in monitoring_extra_collectors %} --collector.{{ c }}{% endfor %}"

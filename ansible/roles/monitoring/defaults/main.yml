@@ -1,0 +1,10 @@
+---
+# Supervision basique : node_exporter (metriques systeme) + sonde HTTP locale
+# exposee comme metrique via le collecteur "textfile".
+monitoring_package: prometheus-node-exporter
+monitoring_service: prometheus-node-exporter
+monitoring_listen_port: 9100            # ouvert au seul SG bastion (module reseau)
+monitoring_textfile_dir: /var/lib/prometheus/node-exporter
+monitoring_extra_collectors: []         # surcharge en staging (group_vars)
+monitoring_probe_url: http://127.0.0.1/health
+monitoring_probe_cron_minute: "*/5"     # surcharge en staging (group_vars)

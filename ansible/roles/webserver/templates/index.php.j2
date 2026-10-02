@@ -1,0 +1,53 @@
+<?php
+// {{ ansible_managed }}
+// Page de test : identite de l'instance + test REEL de connexion a RDS.
+declare(strict_types=1);
+
+$cfg     = require '{{ webserver_config_dir }}/db.php';
+$status  = 'ECHEC';
+$version = '-';
+$cipher  = '-';
+$detail  = '';
+
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+try {
+    $db = mysqli_init();
+    $db->options(MYSQLI_OPT_CONNECT_TIMEOUT, 3);
+    $db->ssl_set(null, null, null, null, null);
+    $db->real_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name'],
+        (int) $cfg['port'], null, MYSQLI_CLIENT_SSL | MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT);
+    $version = (string) $db->query('SELECT VERSION()')->fetch_row()[0];
+    $row     = $db->query("SHOW SESSION STATUS LIKE 'Ssl_cipher'")->fetch_row();
+    $cipher  = ($row[1] ?? '') !== '' ? $row[1] : 'non chiffree';
+    $status  = 'OK';
+    $db->close();
+} catch (mysqli_sql_exception $e) {
+    $detail = 'code erreur ' . $e->getCode();
+}
+unset($cfg);
+$h = fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>TrackFleet - {{ app_env }}</title></head>
+<body style="font-family:sans-serif;max-width:720px;margin:40px auto">
+<h1>TrackFleet</h1>
+<p id="env">Environnement : {{ app_env }}</p>
+<p id="who">Instance : {{ ansible_facts['hostname'] }} | IP {{ ansible_facts['default_ipv4']['address'] }} | AZ {{ az | default('inconnue') }}</p>
+<table border="1" cellpadding="6">
+  <tr><td>Endpoint RDS</td><td>{{ rds_address }}</td></tr>
+  <tr><td>Version MySQL</td><td><?= $h($version) ?></td></tr>
+  <tr><td>Chiffrement TLS</td><td><?= $h($cipher) ?></td></tr>
+</table>
+<p id="db">Connexion RDS : <?= $h($status) ?><?= $detail !== '' ? ' (' . $h($detail) . ')' : '' ?></p>
+{% if webserver_show_debug %}
+<!-- Bloc de diagnostic : active en staging uniquement (group_vars). -->
+<h2>Debug ({{ app_env }})</h2>
+<ul>
+  <li>PHP : <?= $h(PHP_VERSION) ?></li>
+  <li>Niveau de logs Nginx : {{ webserver_log_level }}</li>
+  <li>Noyau : {{ ansible_facts['kernel'] }}</li>
+</ul>
+{% endif %}
+</body>
+</html>

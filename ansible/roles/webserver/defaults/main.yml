@@ -1,0 +1,13 @@
+---
+# Valeurs par defaut du role webserver ; les differences staging/prod sont
+# surchargees dans group_vars/<env>.yml.
+webserver_php_version: "8.1"           # PHP fourni par Ubuntu 22.04
+webserver_root: /var/www/trackfleet
+webserver_config_dir: /etc/trackfleet  # hors racine web
+webserver_log_level: warn              # niveau error_log de Nginx
+webserver_show_debug: false            # bloc de diagnostic sur la page de test
+webserver_packages:
+  - nginx
+  - php-fpm
+  - php-mysql
+  - mysql-client

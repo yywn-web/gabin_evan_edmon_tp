@@ -1,0 +1,9 @@
+---
+# STAGING : diagnostic facilite (logs verbeux, page de debug, sonde frequente).
+app_env: staging
+webserver_log_level: info
+webserver_show_debug: true
+monitoring_extra_collectors:
+  - processes
+  - systemd
+monitoring_probe_cron_minute: "*"      # sonde chaque minute

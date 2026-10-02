@@ -1,0 +1,29 @@
+---
+# Inventaire dynamique : interroge l'API EC2 a chaque execution. Les instances
+# des deux environnements sont reconnues par leurs tags (poses par Terraform)
+# et rangees dans les groupes "staging" et "prod", qui portent les group_vars.
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+
+filters:
+  tag:Project: neocargo
+  tag:Role: app
+  instance-state-name: running
+
+hostnames:
+  - instance-id
+
+compose:
+  ansible_host: private_ip_address        # pas d'IP publique : rebond bastion
+  az: placement.availability_zone
+
+keyed_groups:
+  # Groupes "staging" / "prod" (sans prefixe) : correspondent exactement a
+  # group_vars/staging.yml et group_vars/prod.yml.
+  - key: ec2_tags.Environment
+    prefix: ""
+    separator: ""
+  # Groupe "role_app" cible par site.yml.
+  - key: ec2_tags.Role
+    prefix: role

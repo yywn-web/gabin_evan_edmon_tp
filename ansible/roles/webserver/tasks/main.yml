@@ -1,0 +1,89 @@
+---
+# Role webserver : serveur applicatif TrackFleet (Nginx + PHP-FPM) et page de
+# test connectee a la base RDS de l'environnement.
+
+- name: Installer Nginx, PHP-FPM et les clients MySQL
+  ansible.builtin.apt:
+    name: "{{ webserver_packages }}"
+    state: present
+
+- name: Creer la racine du site
+  ansible.builtin.file:
+    path: "{{ webserver_root }}"
+    state: directory
+    owner: root
+    group: www-data
+    mode: "0755"
+
+# Hors racine web : le fichier contenant le secret ne peut pas etre servi.
+- name: Creer le dossier de configuration applicative
+  ansible.builtin.file:
+    path: "{{ webserver_config_dir }}"
+    state: directory
+    owner: root
+    group: www-data
+    mode: "0750"
+
+# Seul fichier contenant le mot de passe : 0640 root:www-data, no_log masque
+# la valeur et le diff (y compris en --diff).
+- name: Deployer la configuration de connexion a la base
+  ansible.builtin.template:
+    src: db_config.php.j2
+    dest: "{{ webserver_config_dir }}/db.php"
+    owner: root
+    group: www-data
+    mode: "0640"
+  no_log: true
+
+- name: Deployer la page de test
+  ansible.builtin.template:
+    src: index.php.j2
+    dest: "{{ webserver_root }}/index.php"
+    owner: root
+    group: www-data
+    mode: "0644"
+
+- name: Deployer le vhost Nginx
+  ansible.builtin.template:
+    src: nginx_trackfleet.conf.j2
+    dest: /etc/nginx/sites-available/trackfleet.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Redemarrer nginx
+
+# force uniquement en --check : le vhost n'y est pas reellement ecrit.
+- name: Activer le vhost
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/trackfleet.conf
+    dest: /etc/nginx/sites-enabled/trackfleet.conf
+    state: link
+    force: "{{ ansible_check_mode }}"
+  notify: Redemarrer nginx
+
+- name: Desactiver le site Nginx par defaut (pose par l'amorcage user_data)
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Redemarrer nginx
+
+# En --check sur une instance neuve, le paquet n'est pas reellement installe.
+- name: Demarrer PHP-FPM et l'activer au boot
+  ansible.builtin.service:
+    name: "php{{ webserver_php_version }}-fpm"
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Demarrer Nginx et l'activer au boot
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+
+# Applique les redemarrages avant les verifications ci-dessous.
+- name: Appliquer immediatement les redemarrages en attente
+  ansible.builtin.meta: flush_handlers
+
+- name: Verifier le service web
+  ansible.builtin.import_tasks: verify.yml

@@ -1,0 +1,7 @@
+---
+# Rechargement (et non redemarrage) : applique la nouvelle configuration sans
+# couper les sessions SSH en cours, dont celle d'Ansible.
+- name: Recharger sshd
+  ansible.builtin.service:
+    name: ssh
+    state: reloaded

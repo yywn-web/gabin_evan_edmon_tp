@@ -1,0 +1,9 @@
+---
+# Redemarrage uniquement si les options de l'agent changent. En --check sur
+# une instance neuve, le paquet n'est pas reellement installe : on tolere
+# alors l'absence du service (uniquement en check).
+- name: Redemarrer node_exporter
+  ansible.builtin.service:
+    name: "{{ monitoring_service }}"
+    state: restarted
+  ignore_errors: "{{ ansible_check_mode }}"

@@ -1,0 +1,41 @@
+---
+# Verifications automatisees (lecture seule), sautees en --check.
+
+- name: Interroger /health en local
+  ansible.builtin.uri:
+    url: http://127.0.0.1/health
+    return_content: true
+  register: webserver_health
+  when: not ansible_check_mode
+
+- name: Verifier que /health repond 200
+  ansible.builtin.assert:
+    that:
+      - webserver_health.status == 200
+      - "'OK' in webserver_health.content"
+    success_msg: "/health OK"
+  when: not ansible_check_mode
+
+- name: Interroger la page de test en local
+  ansible.builtin.uri:
+    url: http://127.0.0.1/
+    return_content: true
+  register: webserver_page
+  when: not ansible_check_mode
+
+- name: Verifier la connexion reelle a RDS et l'environnement affiche
+  ansible.builtin.assert:
+    that:
+      - webserver_page.status == 200
+      - "'Connexion RDS : OK' in webserver_page.content"
+      - "('Environnement : ' ~ app_env) in webserver_page.content"
+    success_msg: "Page de test OK ({{ app_env }}), connexion RDS confirmee"
+  when: not ansible_check_mode
+
+- name: Verifier que le mot de passe n'apparait pas dans la page
+  ansible.builtin.assert:
+    that:
+      - db_password not in webserver_page.content
+    quiet: true
+  no_log: true
+  when: not ansible_check_mode

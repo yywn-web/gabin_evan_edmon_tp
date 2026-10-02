@@ -1,0 +1,12 @@
+---
+# Declenches uniquement si le vhost change ; validation AVANT redemarrage.
+- name: Valider la configuration nginx
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  listen: Redemarrer nginx
+
+- name: Redemarrer le service nginx
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+  listen: Redemarrer nginx

@@ -1,0 +1,8 @@
+---
+# Valeurs communes aux deux environnements.
+ansible_python_interpreter: /usr/bin/python3
+db_name: trackfleet
+db_user: dbadmin
+db_port: 3306
+# Le mot de passe vient du coffre de l'environnement (vault/<env>.yml).
+db_password: "{{ vault_db_password }}"

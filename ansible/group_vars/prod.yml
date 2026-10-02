@@ -1,0 +1,7 @@
+---
+# PROD : surface d'information minimale et journaux sobres.
+app_env: prod
+webserver_log_level: warn
+webserver_show_debug: false
+monitoring_extra_collectors: []
+monitoring_probe_cron_minute: "*/5"    # sonde toutes les 5 minutes

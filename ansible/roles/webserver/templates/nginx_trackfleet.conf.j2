@@ -1,0 +1,33 @@
+# {{ ansible_managed }}
+# Vhost TrackFleet ({{ app_env }}). Niveau de journalisation differencie par
+# environnement via webserver_log_level.
+server {
+    listen 80 default_server;
+    server_name _;
+    root {{ webserver_root }};
+    index index.php;
+    server_tokens off;
+
+    error_log /var/log/nginx/trackfleet_error.log {{ webserver_log_level }};
+    access_log /var/log/nginx/trackfleet_access.log;
+
+    # Health check de l'ALB : statique, independant de PHP et de RDS.
+    location = /health {
+        access_log off;
+        default_type text/plain;
+        return 200 "OK\n";
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php{{ webserver_php_version }}-fpm.sock;
+    }
+
+    location ~ /\. {
+        deny all;
+    }
+}

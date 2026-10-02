@@ -1,0 +1,19 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Sonde de disponibilite de TrackFleet ({{ app_env }}) : ecrit des metriques
+# au format Prometheus, lues par le collecteur textfile de node_exporter.
+# Ecriture atomique (fichier temporaire puis mv) : jamais de fichier partiel.
+set -u
+OUT="{{ monitoring_textfile_dir }}/trackfleet.prom"
+TMP="$(mktemp "${OUT}.XXXXXX")"
+if T=$(curl -s -o /dev/null -w '%{time_total}' --max-time 5 "{{ monitoring_probe_url }}"); then UP=1; else UP=0; T=0; fi
+cat > "$TMP" <<PROM
+# HELP trackfleet_http_up Disponibilite du point /health (1 = OK).
+# TYPE trackfleet_http_up gauge
+trackfleet_http_up{env="{{ app_env }}"} ${UP}
+# HELP trackfleet_http_response_seconds Temps de reponse de /health.
+# TYPE trackfleet_http_response_seconds gauge
+trackfleet_http_response_seconds{env="{{ app_env }}"} ${T}
+PROM
+chmod 0644 "$TMP"
+mv "$TMP" "$OUT"

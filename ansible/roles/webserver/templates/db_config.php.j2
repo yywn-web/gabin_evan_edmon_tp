@@ -1,0 +1,10 @@
+<?php
+// {{ ansible_managed }}
+// Connexion RDS de l'environnement {{ app_env }}. Hors racine web, 0640.
+return [
+    'host'     => '{{ rds_address }}',
+    'port'     => {{ db_port }},
+    'name'     => '{{ db_name }}',
+    'user'     => '{{ db_user }}',
+    'password' => '{{ db_password }}',
+];
